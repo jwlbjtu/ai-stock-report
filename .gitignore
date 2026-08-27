@@ -17,6 +17,7 @@ dist/
 
 # Logs
 *.log
+logs/
 
 # OS / editor
 .DS_Store

@@ -17,6 +17,8 @@
 ```
 main.py              主程序 + 调度 + 顶层兜底 + 幂等锁
 config.json          非敏感静态配置（板块/ticker/阈值），带 schema 校验
+config.py            配置加载 + schema 校验
+logger.py            日志初始化
 market_calendar.py   交易日判断
 quant_engine.py      行情、指标、双权重、异动、基准
 news_fetcher.py      新闻采集（结构化输出）

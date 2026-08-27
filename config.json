@@ -1,0 +1,82 @@
+{
+  "data": {
+    "period": "5d",
+    "interval": "5m"
+  },
+  "sub_sectors": [
+    {
+      "name": "AI 芯片与半导体",
+      "tickers": [
+        {"symbol": "NVDA", "enabled": true},
+        {"symbol": "AMD", "enabled": true},
+        {"symbol": "AVGO", "enabled": true},
+        {"symbol": "TSM", "enabled": true},
+        {"symbol": "MU", "enabled": true},
+        {"symbol": "INTC", "enabled": true},
+        {"symbol": "MRVL", "enabled": true},
+        {"symbol": "ARM", "enabled": true}
+      ]
+    },
+    {
+      "name": "云计算与超大规模",
+      "tickers": [
+        {"symbol": "MSFT", "enabled": true},
+        {"symbol": "AMZN", "enabled": true},
+        {"symbol": "GOOGL", "enabled": true},
+        {"symbol": "META", "enabled": true},
+        {"symbol": "ORCL", "enabled": true},
+        {"symbol": "CRM", "enabled": true},
+        {"symbol": "NOW", "enabled": true}
+      ]
+    },
+    {
+      "name": "AI 软件与数据平台",
+      "tickers": [
+        {"symbol": "PLTR", "enabled": true},
+        {"symbol": "SNOW", "enabled": true},
+        {"symbol": "CRWD", "enabled": true},
+        {"symbol": "DDOG", "enabled": true},
+        {"symbol": "NET", "enabled": true},
+        {"symbol": "MDB", "enabled": true},
+        {"symbol": "PANW", "enabled": true}
+      ]
+    },
+    {
+      "name": "消费电子与硬件",
+      "tickers": [
+        {"symbol": "AAPL", "enabled": true},
+        {"symbol": "DELL", "enabled": true},
+        {"symbol": "SMCI", "enabled": true},
+        {"symbol": "HPE", "enabled": true}
+      ]
+    }
+  ],
+  "benchmarks": ["QQQ", "SOX"],
+  "thresholds": {
+    "split_guard_pct": 50.0,
+    "market_cap_coverage_min": 0.8,
+    "align_window_minutes": 60,
+    "news_window_hours": 24,
+    "shape_gap_threshold_pct": 0.5,
+    "shape_intraday_threshold_pct": 0.5
+  },
+  "news": {
+    "alpha_vantage_topics": "technology",
+    "alpha_vantage_limit": 200,
+    "google_news_queries": [
+      "AI stocks",
+      "artificial intelligence stocks",
+      "semiconductor stocks"
+    ]
+  },
+  "llm": {
+    "model": "deepseek-chat",
+    "temperature": 0.2,
+    "max_tokens": 4000,
+    "base_url": "https://api.deepseek.com"
+  },
+  "report": {
+    "output_dir": "report",
+    "base_url": "https://YOUR-DOMAIN.COM/reports"
+  }
+}

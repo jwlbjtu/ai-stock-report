@@ -1,0 +1,18 @@
+# 行情 / 日历
+yfinance~=1.7.0
+pandas~=3.0.5
+numpy~=2.5.2
+pandas-market-calendars~=5.4.0
+pytz~=2026.3
+
+# 新闻
+feedparser~=6.0.14
+
+# LLM
+openai~=2.48.0
+
+# 推送 / HTTP
+requests~=2.34.2
+
+# 配置 / 密钥
+python-dotenv~=1.2.2
