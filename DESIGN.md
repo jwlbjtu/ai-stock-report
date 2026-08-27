@@ -83,6 +83,7 @@ DESIGN.md            本文档
 - **交付分层**：摘要（几百字）推送 + 完整报告网页链接。
 - **WxPusher**：`https://`，`contentType=3`（Markdown 安全子集：加粗/链接/纯文本），成功码 `1000`。
 - **Telegram**：摘要**纯文本**（不传 `parse_mode`）。
+- **多收件人**：`.env` 的 `WXPUSHER_UIDS` / `TELEGRAM_CHAT_IDS` 支持逗号分隔多值；Telegram 循环逐发，WxPusher 一次请求传多个 UID。
 - **降级链**：WxPusher 明确失败 → Telegram → 都失败则**落盘 + 日志标记**。
 - **幂等**：主通道**确认失败**才切备，每次发送结果打日志，避免重复推送。
 - **切分**：仅完整报告需切分时按段落边界切，绝不在表格/代码块中间。
@@ -157,8 +158,8 @@ DESIGN.md            本文档
 ### A. 需开通/提供的密钥
 1. DeepSeek API key（需预充值，唯一付费项）
 2. Alpha Vantage API key（免费，25 次/天）
-3. WxPusher appToken + 接收者 UID
-4. Telegram bot token + chat_id
+3. WxPusher appToken + 接收者 UID（可多个，逗号分隔）
+4. Telegram bot token + chat_id（可多个，逗号分隔）
 
 ### B. 内容决策（已定）
 5. watchlist：见第 5 节（已定稿）

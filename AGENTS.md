@@ -12,7 +12,7 @@
 - **市值**：`Ticker.info['marketCap']`，缺失跳过+覆盖率上报，<80% 降级等权；循环节流+重试+落盘缓存。
 - **新闻**：Alpha Vantage `NEWS_SENTIMENT`（`topics` 单次调用 + 客户端按 `ticker_sentiment` 过滤）为主，Google News RSS 兜底；禁止逐票调 Alpha Vantage（25次/天额度）。每条必须带时间戳，24h 窗口，去重。
 - **LLM**：`deepseek-chat` 为主；关联解读（非因果归因）；60min 时间对齐在代码里做；混合 JSON 输出（结构化字段+prose 字段，代码自行渲染）；4 禁令（禁编数字/禁编新闻/禁因果断言/禁预测荐股）+ 免责声明；记忆带日期 key，LLM 失败不写记忆。
-- **推送**：摘要+网页链接（VPS 静态托管 + 域名 https）；WxPusher(https, contentType=3, code==1000)→Telegram(纯文本)→落盘；幂等。
+- **推送**：摘要+网页链接（VPS 静态托管 + 域名 https）；WxPusher(https, contentType=3, code==1000)→Telegram(纯文本)→落盘；幂等；多收件人（UIDS/CHAT_IDS 逗号分隔，TG 循环发、WxPusher 一次发）。
 - **报告 HTML**：静态 HTML（内联 CSS），移动端优先（viewport、单列、字号≥16px、表格横向滚动）。
 - **工程化**：logging 标准、顶层 try/except 失败告警、cron 幂等锁、secrets 走 `.env`（P0 生成含占位符、git 忽略）、依赖锁主次版本、量化口径单元测试。
 - **版本管理**：本地 git 仓库（`.gitignore` 排除 `.env`/`report/`/缓存），之后推 GitHub（等用户给 repo URL）。
@@ -29,4 +29,4 @@
 - 启动时健康校验：拉不到数据/市值的 ticker 自动标"数据异常"。
 
 ## 人工待办（实现前需用户提供）
-DeepSeek key（付费）、Alpha Vantage key（免费）、WxPusher appToken+UID、Telegram bot token+chat_id、运行机器+cron、GitHub 仓库地址（push 用）、报告访问域名（https）。
+DeepSeek key（付费）、Alpha Vantage key（免费）、WxPusher appToken+UIDS（可多个逗号分隔）、Telegram bot token+CHAT_IDS（可多个逗号分隔）、运行机器+cron、GitHub 仓库地址（push 用）、报告访问域名（https）。
