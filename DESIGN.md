@@ -176,3 +176,16 @@ DESIGN.md            本文档
 ### D. 上线后
 13. 首日抽查：核对报告涨跌幅 vs 行情软件
 14. watchlist 维护（退市/新增/并购）
+
+## 11. 部署运行（cron）
+
+服务器时区设为美东（或使用 `CRON_TZ`）：
+
+```
+CRON_TZ=America/New_York
+35 17 * * 1-5 cd /path/to/ai-stock-report && python3 main.py >> logs/cron.log 2>&1
+```
+
+- `1-5` 仅工作日触发，`is_trading_day()` 再兜底节假日；
+- `35 17` = 17:35 ET（收盘后，规避早收盘半日市）；
+- 幂等：同日重复触发会被 `cache/last_run.txt` 锁拦截；失败会自动释放锁以便重试。
