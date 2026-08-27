@@ -7,6 +7,9 @@ report/
 # Runtime cache (market cap / quote info)
 cache/
 
+# Runtime memory (daily summaries)
+memory/
+
 # Python
 __pycache__/
 *.py[cod]

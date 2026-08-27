@@ -65,6 +65,7 @@ def test_compute_metrics_gaokaizou():
     assert m["shape"] == "高开低走"
     assert m["max_move_val"] == round((102.0 - 105.0) / 105.0 * 100, 2)
     assert m["max_move_time"] == "09:45 ET"
+    assert m["max_move_time_iso"].startswith("2026-07-24T09:45")
     assert m["split_guard"] is False
 
 

@@ -70,10 +70,12 @@ def compute_metrics(
     valid = moves.dropna()
     if valid.empty:
         max_move_time = None
+        max_move_time_iso = None
         max_move_val = None
     else:
         idx = valid.abs().idxmax()
         max_move_time = _fmt_time_et(idx)
+        max_move_time_iso = pd.Timestamp(idx).isoformat()
         max_move_val = float(valid.loc[idx])
 
     return {
@@ -83,6 +85,7 @@ def compute_metrics(
         "intraday_pct": round(intraday_pct, 2),
         "gap_pct": round(gap_pct, 2),
         "max_move_time": max_move_time,
+        "max_move_time_iso": max_move_time_iso,
         "max_move_val": None if max_move_val is None else round(max_move_val, 2),
         "shape": classify_shape(
             gap_pct,
