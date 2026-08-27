@@ -16,3 +16,6 @@ requests~=2.34.2
 
 # 配置 / 密钥
 python-dotenv~=1.2.2
+
+# 测试
+pytest~=8.0
