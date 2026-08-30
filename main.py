@@ -18,7 +18,7 @@ from market_calendar import is_trading_day, now_et
 from news_fetcher import fetch_news
 from notifier import parse_recipients, send_notification, send_telegram
 from quant_engine import run_quant
-from render import render_html
+from render import render_html, write_index
 
 log = get_logger(__name__)
 
@@ -97,6 +97,9 @@ def main() -> None:
             config["report"]["base_url"],
         )
         log.info("报告已生成：%s", report_url)
+
+        write_index(config["report"]["output_dir"])
+        log.info("报告列表 index.html 已更新")
 
         send_result = send_notification(quant_result, llm_result, report_url)
         log.info("推送结果：%s", send_result)

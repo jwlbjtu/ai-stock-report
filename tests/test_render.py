@@ -1,4 +1,4 @@
-from render import render_html
+from render import render_html, render_index, write_index
 
 
 def test_render_html_contains_data():
@@ -45,3 +45,24 @@ def test_render_html_escapes_special_chars():
     html = render_html(llm, quant)
     assert "<script>" not in html
     assert "&lt;script&gt;" in html
+
+
+def test_render_index_lists_dates():
+    html = render_index(["2026-08-27", "2026-08-26"])
+    assert "2026-08-27.html" in html
+    assert "2026-08-26.html" in html
+
+
+def test_render_index_empty():
+    assert "暂无报告" in render_index([])
+
+
+def test_write_index(tmp_path):
+    (tmp_path / "2026-08-27.html").write_text("x", encoding="utf-8")
+    (tmp_path / "2026-08-26.html").write_text("x", encoding="utf-8")
+    write_index(str(tmp_path))
+    content = (tmp_path / "index.html").read_text(encoding="utf-8")
+    assert "2026-08-27.html" in content
+    assert "2026-08-26.html" in content
+    # index 自身不应出现在列表里
+    assert "index.html</a>" not in content

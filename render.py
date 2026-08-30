@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 import html as _html
-from typing import Any, Dict, Optional
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 _CSS = """
 :root { --fg:#111; --muted:#666; --line:#e5e5e5; --accent:#2563eb; }
@@ -107,3 +108,42 @@ def render_html(llm_result: Dict[str, Any], quant_result: Dict[str, Any]) -> str
         + f"<div class='footer'>{_esc(disclaimer)}</div>"
         + "</div></body></html>"
     )
+
+
+_INDEX_CSS = """
+* { box-sizing: border-box; }
+body { margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'PingFang SC','Microsoft YaHei',sans-serif; color:#111; line-height:1.6; font-size:16px; background:#fff; }
+.wrap { max-width:760px; margin:0 auto; padding:24px 16px 48px; }
+h1 { font-size:20px; margin:0 0 16px; }
+ul { list-style:none; padding:0; margin:0; }
+li { margin:0 0 8px; }
+a { display:block; padding:12px 14px; background:#f8fafc; border:1px solid #e5e5e5; border-radius:8px; color:#2563eb; text-decoration:none; }
+a:hover { background:#eff6ff; }
+"""
+
+
+def render_index(dates: List[str]) -> str:
+    """生成报告列表 HTML（日期倒序）。dates 为 'YYYY-MM-DD' 字符串列表。"""
+    if not dates:
+        items = "<li>暂无报告</li>"
+    else:
+        items = "".join(f"<li><a href='{_esc(d)}.html'>📄 {_esc(d)}</a></li>" for d in dates)
+    return (
+        "<!DOCTYPE html><html lang='zh-CN'><head><meta charset='utf-8'>"
+        "<meta name='viewport' content='width=device-width, initial-scale=1.0'>"
+        "<title>美股科技/AI 复盘报告列表</title>"
+        f"<style>{_INDEX_CSS}</style></head><body><div class='wrap'>"
+        "<h1>📊 美股科技/AI 复盘报告列表</h1>"
+        f"<ul>{items}</ul>"
+        "</div></body></html>"
+    )
+
+
+def write_index(output_dir: str) -> str:
+    """扫描 output_dir 下的 *.html（不含 index 自身），写 index.html。返回路径。"""
+    out = Path(output_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    dates = sorted((f.stem for f in out.glob("*.html") if f.stem != "index"), reverse=True)
+    path = out / "index.html"
+    path.write_text(render_index(dates), encoding="utf-8")
+    return str(path)
