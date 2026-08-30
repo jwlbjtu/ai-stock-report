@@ -77,6 +77,6 @@
   },
   "report": {
     "output_dir": "report",
-    "base_url": "https://YOUR-DOMAIN.COM/reports"
+    "base_url": "https://reports.buildbodys.com"
   }
 }
