@@ -2,7 +2,8 @@
 .env
 
 # Generated reports
-report/
+report/*
+!report/.gitkeep
 
 # Runtime cache (market cap / quote info)
 cache/
