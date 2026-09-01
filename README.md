@@ -55,6 +55,7 @@ ai-stock-report/
 ├── cache/                # 运行时缓存（git 忽略）
 ├── memory/               # 跨日记忆（git 忽略）
 ├── DESIGN.md             # 详细设计文档
+├── DEPLOY.md             # 部署与运维手册（VPS 部署 + 更新）
 └── README.md
 ```
 
@@ -117,6 +118,8 @@ python3 main.py
 ## 定时任务（cron）
 
 系统设计为 **每个交易日美东 17:35** 运行一次（收盘后，规避早收盘半日市）。
+
+> 📘 完整的 VPS 部署（nginx + HTTPS + venv）与日常更新策略见 [DEPLOY.md](DEPLOY.md)。
 
 ### 1. 编辑 crontab
 
