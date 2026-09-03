@@ -4,6 +4,7 @@
 """
 from __future__ import annotations
 
+import copy
 import datetime as dt
 import json
 import logging
@@ -32,9 +33,10 @@ SYSTEM_PROMPT = """你是一位华尔街资深量化交易员，负责撰写美�
 
 【分析维度】
 1. 资金广度：对比每个板块市值加权涨幅 r_cap 与算术平均涨幅 r_eq，判断资金在龙头抱团还是向下扩散。
-2. 关联解读：结合板块最大异动时刻（max_move_time）与该时刻附近的新闻做关联性解读（代码已按 ±窗口 过滤好，直接用），必须用不确定措辞。
+2. 关联解读：结合板块最大异动时刻（max_move_time）与该时刻附近的新闻做关联性解读（代码已按 ±窗口 过滤好，直接用），必须用不确定措辞。可结合量价：rel_volume（相对20日量能，>1放量/<1缩量）与 max_move_volume_ratio（异动时刻量能倍数）判断异动是否有量能配合。
 3. 形态点评：对"高开低走/低开高走/单边"等形态，解读日内情绪反转节点。
-4. 连续性复盘：结合"昨日历史上下文"，指出今日趋势是延续还是反转。
+4. 趋势位置：结合 price_vs_ma20 / price_vs_ma50（现价相对20/50日均线偏离%）与 pct_from_52w_high（距52周高点%，为负）判断个股处于趋势什么位置（强势/超买/弱势/超跌）。
+5. 连续性复盘：结合"昨日历史上下文"与趋势位置，指出今日趋势是延续还是反转。
 
 【输出格式】
 严格输出一个 json 对象（JSON 格式），不要输出任何 JSON 之外的文字，不要用 markdown 代码块包裹。结构如下：
@@ -143,6 +145,15 @@ def _trim_news(news: List[Dict[str, Any]], limit: int = 30, summary_len: int = 1
     return out
 
 
+def _sanitize_quant(quant_result: Dict[str, Any]) -> Dict[str, Any]:
+    """剔除仅供渲染使用的批量字段（如 intraday_closes），避免撑大 LLM prompt。"""
+    q = copy.deepcopy(quant_result)
+    for sector in q.get("sectors", []):
+        for s in sector.get("stocks", []):
+            s.pop("intraday_closes", None)
+    return q
+
+
 def build_user_prompt(
     quant_result: Dict[str, Any],
     news: List[Dict[str, Any]],
@@ -150,7 +161,7 @@ def build_user_prompt(
     yesterday_summary: Optional[str],
 ) -> str:
     parts = ["【今日量化数据——唯一事实来源，所有数字只能从这里取】"]
-    parts.append(json.dumps(quant_result, ensure_ascii=False))
+    parts.append(json.dumps(_sanitize_quant(quant_result), ensure_ascii=False))
 
     parts.append("")
     if news:

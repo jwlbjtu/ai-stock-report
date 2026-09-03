@@ -9,8 +9,10 @@ from news_fetcher import (
     enrich_relevance,
     filter_window,
     normalize_av_item,
+    normalize_eastmoney_item,
     normalize_google_item,
     parse_av_time,
+    parse_eastmoney_time,
 )
 
 UTC = pytz.utc
@@ -99,3 +101,26 @@ def test_enrich_relevance():
     assert out[0]["matched_tickers"] == ["NVDA"]
     assert out[1]["matched_tickers"] == ["AAPL"]
     assert out[2]["matched_tickers"] == []
+
+
+def test_parse_eastmoney_time():
+    assert parse_eastmoney_time("2026-08-27 16:30:00") == "2026-08-27T08:30:00+00:00"
+    assert parse_eastmoney_time("") is None
+    assert parse_eastmoney_time("not-a-time") is None
+
+
+def test_normalize_eastmoney_item():
+    item = {
+        "title": "英伟达发布新芯片",
+        "content": "<p>英伟达 &amp; 新品</p>",
+        "url": "http://finance.eastmoney.com/a/1.html",
+        "date": "2026-08-27 16:30:00",
+        "mediaName": "财联社",
+    }
+    n = normalize_eastmoney_item(item)
+    assert n["title"] == "英伟达发布新芯片"
+    assert n["summary"] == "英伟达 & 新品"
+    assert n["published_at"] == "2026-08-27T08:30:00+00:00"
+    assert n["source"] == "财联社"
+    assert n["sentiment"] is None
+    assert n["related_tickers"] == []

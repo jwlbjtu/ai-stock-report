@@ -7,6 +7,7 @@ from quant_engine import (
     compute_cap_weight,
     compute_equal_weight,
     compute_metrics,
+    compute_trend,
     parse_download,
 )
 
@@ -103,3 +104,50 @@ def test_cap_weight_all_missing():
     assert r is None
     assert cov == 0.0
     assert covered == 0
+
+
+def _make_daily() -> pd.DataFrame:
+    n = 60
+    dates = pd.date_range("2026-01-01", periods=n, freq="B", tz=ET)
+    close = [100.0 + i for i in range(n)]
+    return pd.DataFrame(
+        {
+            "Open": [c - 0.5 for c in close],
+            "High": [c + 1 for c in close],
+            "Low": [c - 1 for c in close],
+            "Close": close,
+            "Volume": [1000] * n,
+        },
+        index=dates,
+    )
+
+
+def test_compute_trend():
+    daily = _make_daily()
+    t = compute_trend(daily)
+    closes = daily["Close"]
+    last = float(closes.iloc[-1])
+    assert t["ma20"] == round(closes.iloc[-20:].mean(), 2)
+    assert t["ma50"] == round(closes.iloc[-50:].mean(), 2)
+    assert t["rel_volume"] == 1.0
+    hi = float(daily["High"].max())
+    assert t["pct_from_52w_high"] == round((last - hi) / hi * 100, 2)
+    assert t["price_vs_ma20"] == round((last - t["ma20"]) / t["ma20"] * 100, 2)
+
+
+def test_compute_trend_short_data():
+    daily = pd.DataFrame({
+        "Close": [1.0, 2.0, 3.0], "High": [1.0, 2.0, 3.0],
+        "Low": [1.0, 2.0, 3.0], "Volume": [10, 10, 10],
+    })
+    t = compute_trend(daily)
+    assert "ma20" not in t
+    assert "ma50" not in t
+    assert "rel_volume" not in t
+
+
+def test_compute_metrics_new_fields():
+    today, backup = parse_download(_make_df(), "AAPL")
+    m = compute_metrics(today, backup, THR)
+    assert m["intraday_closes"] == [105.0, 104.0, 103.0, 102.0]
+    assert m["max_move_volume_ratio"] == 1.0

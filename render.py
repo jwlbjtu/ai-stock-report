@@ -17,7 +17,7 @@ h2 { font-size:18px; margin:28px 0 10px; border-left:4px solid var(--accent); pa
 .prose { margin:8px 0; }
 .bench { display:inline-block; margin:0 8px 8px 0; padding:4px 10px; background:#f3f4f6; border-radius:6px; font-size:14px; }
 .table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; margin:12px 0; border:1px solid var(--line); border-radius:8px; }
-table { border-collapse:collapse; width:100%; font-size:14px; min-width:540px; }
+table { border-collapse:collapse; width:100%; font-size:14px; min-width:640px; }
 th,td { border-bottom:1px solid var(--line); padding:8px 12px; text-align:left; }
 th { color:var(--muted); font-weight:600; background:#fafafa; }
 tr:last-child td { border-bottom:none; }
@@ -25,6 +25,15 @@ td.num { text-align:right; font-variant-numeric:tabular-nums; }
 .pos { color:#16a34a; } .neg { color:#dc2626; }
 .risk { background:#fef2f2; border-radius:8px; padding:12px 14px; margin-top:24px; }
 .footer { color:var(--muted); font-size:12px; margin-top:32px; border-top:1px solid var(--line); padding-top:12px; }
+.heatmap { display:grid; grid-template-columns:repeat(auto-fill, minmax(86px,1fr)); gap:6px; margin:12px 0; }
+.tile { border-radius:8px; padding:8px 6px; text-align:center; }
+.t-sym { font-weight:600; font-size:13px; }
+.t-pct { font-size:12px; }
+.spark { width:70px; height:24px; vertical-align:middle; }
+.spark-cell { width:74px; }
+.sym { font-weight:600; }
+.trend { font-size:11px; color:var(--muted); white-space:nowrap; }
+.muted { font-size:12px; color:var(--muted); }
 """
 
 
@@ -45,6 +54,38 @@ def _esc(s: Any) -> str:
     return _html.escape(str(s or ""))
 
 
+def _sparkline(closes: Optional[List[float]], up: bool) -> str:
+    if not closes or len(closes) < 2:
+        return ""
+    mn, mx = min(closes), max(closes)
+    if mx == mn:
+        pts = ["0,15", "100,15"]
+    else:
+        n = len(closes)
+        pts = [
+            f"{i / (n - 1) * 100:.1f},{30 - (v - mn) / (mx - mn) * 30:.1f}"
+            for i, v in enumerate(closes)
+        ]
+    color = "#16a34a" if up else "#dc2626"
+    return (
+        f"<svg class='spark' viewBox='0 0 100 30' preserveAspectRatio='none'>"
+        f"<polyline fill='none' stroke='{color}' stroke-width='1.5' points='{' '.join(pts)}'/></svg>"
+    )
+
+
+def _heat_style(change: Optional[float]) -> str:
+    if change is None:
+        return "background:#e5e5e5;color:#666;"
+    mag = min(abs(change) / 5.0, 1.0)
+    if change >= 0:
+        bg = f"rgba(22,163,74,{0.15 + 0.7 * mag:.3f})"
+        fg = "#fff" if mag > 0.4 else "#14532d"
+    else:
+        bg = f"rgba(220,38,38,{0.15 + 0.7 * mag:.3f})"
+        fg = "#fff" if mag > 0.4 else "#7f1d1d"
+    return f"background:{bg};color:{fg};"
+
+
 def render_html(llm_result: Dict[str, Any], quant_result: Dict[str, Any]) -> str:
     date = quant_result["date"]
     summary = (llm_result or {}).get("summary", "")
@@ -59,6 +100,17 @@ def render_html(llm_result: Dict[str, Any], quant_result: Dict[str, Any]) -> str
         f"<span class='bench'>{_esc(k)} {_fmt_pct(v)}</span>" for k, v in bench.items() if v is not None
     )
 
+    all_stocks = []
+    for s in quant_result.get("sectors", []):
+        all_stocks.extend(s.get("stocks", []))
+    all_stocks.sort(key=lambda x: x.get("change_pct") if x.get("change_pct") is not None else -1e9, reverse=True)
+    heatmap_html = "".join(
+        f"<div class='tile' style='{_heat_style(st.get('change_pct'))}'>"
+        f"<div class='t-sym'>{_esc(st.get('symbol', ''))}</div>"
+        f"<div class='t-pct'>{_fmt_pct(st.get('change_pct'))}</div></div>"
+        for st in all_stocks
+    )
+
     sectors_html = []
     for s in quant_result.get("sectors", []):
         name = s["name"]
@@ -68,19 +120,43 @@ def render_html(llm_result: Dict[str, Any], quant_result: Dict[str, Any]) -> str
 
         rows = []
         for st in s.get("stocks", []):
+            chg = st.get("change_pct")
+            spark = _sparkline(st.get("intraday_closes"), chg is not None and chg >= 0)
+
+            rv = st.get("rel_volume")
+            vol_cell = "—" if rv is None else f"{rv:.2f}x"
+
+            move_cell = _esc(st.get("max_move_time") or "")
+            mvr = st.get("max_move_volume_ratio")
+            if mvr is not None and mvr >= 1.5:
+                move_cell += f" <span class='muted'>放量{mvr:.1f}x</span>"
+
+            trend_parts = []
+            pv20 = st.get("price_vs_ma20")
+            if pv20 is not None:
+                trend_parts.append(f"20日{'上' if pv20 >= 0 else '下'}{abs(pv20):.1f}%")
+            ph = st.get("pct_from_52w_high")
+            if ph is not None:
+                trend_parts.append(f"距高{ph:.1f}%")
+            sym_cell = f"<div class='sym'>{_esc(st.get('symbol', ''))}</div>"
+            if trend_parts:
+                sym_cell += f"<div class='trend'>{_esc(' · '.join(trend_parts))}</div>"
+
             rows.append(
                 "<tr>"
-                f"<td>{_esc(st.get('symbol', ''))}</td>"
-                f"<td class='num'>{_colored_pct(st.get('change_pct'))}</td>"
+                f"<td>{sym_cell}</td>"
+                f"<td class='spark-cell'>{spark}</td>"
+                f"<td class='num'>{_colored_pct(chg)}</td>"
                 f"<td class='num'>{_fmt_pct(st.get('intraday_pct'))}</td>"
                 f"<td class='num'>{_fmt_pct(st.get('gap_pct'))}</td>"
                 f"<td>{_esc(st.get('shape', ''))}</td>"
-                f"<td>{_esc(st.get('max_move_time') or '')}</td>"
+                f"<td class='num'>{vol_cell}</td>"
+                f"<td>{move_cell}</td>"
                 "</tr>"
             )
         table = (
             "<div class='table-wrap'><table><thead><tr>"
-            "<th>代码</th><th>涨跌幅</th><th>日内</th><th>跳空</th><th>形态</th><th>最大异动</th>"
+            "<th>代码</th><th>走势</th><th>涨跌幅</th><th>日内</th><th>跳空</th><th>形态</th><th>量能</th><th>最大异动</th>"
             "</tr></thead><tbody>" + "".join(rows) + "</tbody></table></div>"
         )
 
@@ -101,6 +177,7 @@ def render_html(llm_result: Dict[str, Any], quant_result: Dict[str, Any]) -> str
         f"<div class='date'>由 AI 自动生成 · {_esc(date)}</div>"
         + (f"<p class='prose'>{_esc(summary)}</p>" if summary else "")
         + (f"<p class='prose'>{_esc(core)}</p>" if core else "")
+        + (f"<h2>市场全景</h2><div class='heatmap'>{heatmap_html}</div>" if heatmap_html else "")
         + (f"<h2>基准</h2><div>{bench_html}</div>" if bench_html else "")
         + "".join(sectors_html)
         + (f"<h2>连续性复盘</h2><p class='prose'>{_esc(continuity)}</p>" if continuity else "")

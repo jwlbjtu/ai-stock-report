@@ -14,6 +14,15 @@ from quant_engine import classify_shape, compute_cap_weight, compute_equal_weigh
 from render import render_html, write_index
 
 
+def _gen_closes(rng, intraday_pct, n=20):
+    base = 100.0
+    pts = [base]
+    for _ in range(n - 2):
+        pts.append(pts[-1] * (1 + rng.uniform(-0.008, 0.008)))
+    pts.append(base * (1 + intraday_pct / 100))
+    return [round(p, 2) for p in pts]
+
+
 def make_quant(cfg, date_str, rng):
     sectors = []
     for sec in cfg["sub_sectors"]:
@@ -44,6 +53,11 @@ def make_quant(cfg, date_str, rng):
                 "max_move_val": round(rng.uniform(-3, 3), 2),
                 "shape": shape,
                 "split_guard": False,
+                "intraday_closes": _gen_closes(rng, intraday),
+                "max_move_volume_ratio": round(rng.uniform(0.6, 3.0), 2),
+                "rel_volume": round(rng.uniform(0.5, 2.5), 2),
+                "price_vs_ma20": round(rng.uniform(-8, 12), 2),
+                "pct_from_52w_high": round(rng.uniform(-40, -0.5), 2),
             })
             changes.append(change)
             caps.append(rng.uniform(30e9, 3000e9))

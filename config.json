@@ -52,6 +52,34 @@
     }
   ],
   "benchmarks": ["QQQ", "SOX"],
+  "chinese_names": {
+    "NVDA": "英伟达",
+    "AMD": "超威半导体",
+    "AVGO": "博通",
+    "TSM": "台积电",
+    "MU": "美光科技",
+    "INTC": "英特尔",
+    "MRVL": "迈威尔科技",
+    "ARM": "Arm",
+    "MSFT": "微软",
+    "AMZN": "亚马逊",
+    "GOOGL": "谷歌",
+    "META": "Meta",
+    "ORCL": "甲骨文",
+    "CRM": "赛富时",
+    "NOW": "ServiceNow",
+    "PLTR": "Palantir",
+    "SNOW": "Snowflake",
+    "CRWD": "CrowdStrike",
+    "DDOG": "Datadog",
+    "NET": "Cloudflare",
+    "MDB": "MongoDB",
+    "PANW": "派拓网络",
+    "AAPL": "苹果",
+    "DELL": "戴尔科技",
+    "SMCI": "超微电脑",
+    "HPE": "慧与"
+  },
   "thresholds": {
     "split_guard_pct": 50.0,
     "market_cap_coverage_min": 0.8,
@@ -67,7 +95,11 @@
       "AI stocks",
       "artificial intelligence stocks",
       "semiconductor stocks"
-    ]
+    ],
+    "eastmoney": {
+      "enabled": true,
+      "max_per_keyword": 5
+    }
   },
   "llm": {
     "model": "deepseek-chat",

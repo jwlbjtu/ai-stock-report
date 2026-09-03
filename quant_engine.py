@@ -68,15 +68,33 @@ def compute_metrics(
     # 15 分钟滚动涨跌幅 = 5m Close 的 pct_change(3)
     moves = today_bars["Close"].pct_change(3) * 100
     valid = moves.dropna()
+    move_idx = None
     if valid.empty:
         max_move_time = None
         max_move_time_iso = None
         max_move_val = None
     else:
-        idx = valid.abs().idxmax()
-        max_move_time = _fmt_time_et(idx)
-        max_move_time_iso = pd.Timestamp(idx).isoformat()
-        max_move_val = float(valid.loc[idx])
+        move_idx = valid.abs().idxmax()
+        max_move_time = _fmt_time_et(move_idx)
+        max_move_time_iso = pd.Timestamp(move_idx).isoformat()
+        max_move_val = float(valid.loc[move_idx])
+
+    # 走势序列（供 sparkline）
+    intraday_closes = [round(float(x), 2) for x in today_bars["Close"].dropna()]
+
+    # 异动时刻相对量能：该 5m 成交量 / 当日 5m 平均成交量
+    max_move_volume_ratio = None
+    if move_idx is not None and "Volume" in today_bars:
+        vols = today_bars["Volume"].dropna()
+        if not vols.empty:
+            avg_vol = float(vols.mean())
+            if avg_vol > 0:
+                try:
+                    move_vol = float(vols.loc[move_idx])
+                    if pd.notna(move_vol):
+                        max_move_volume_ratio = round(move_vol / avg_vol, 2)
+                except (KeyError, TypeError):
+                    pass
 
     return {
         "open": round(open_, 2),
@@ -87,6 +105,8 @@ def compute_metrics(
         "max_move_time": max_move_time,
         "max_move_time_iso": max_move_time_iso,
         "max_move_val": None if max_move_val is None else round(max_move_val, 2),
+        "intraday_closes": intraday_closes,
+        "max_move_volume_ratio": max_move_volume_ratio,
         "shape": classify_shape(
             gap_pct,
             intraday_pct,
@@ -130,6 +150,43 @@ def compute_cap_weight(
     return round(r_cap, 2), round(coverage, 4), covered, total
 
 
+def compute_trend(daily: Optional[pd.DataFrame]) -> Dict[str, Optional[float]]:
+    """从日线（时间升序，含今日）计算趋势与量能指标。
+
+    返回 ma20/ma50/price_vs_ma20/price_vs_ma50/pct_from_52w_high/pct_from_52w_low/rel_volume。
+    """
+    out: Dict[str, Optional[float]] = {}
+    if daily is None or daily.empty or "Close" not in daily:
+        return out
+    close = daily["Close"].dropna()
+    if close.empty:
+        return out
+    last = float(close.iloc[-1])
+    if len(close) >= 20:
+        ma20 = float(close.iloc[-20:].mean())
+        out["ma20"] = round(ma20, 2)
+        out["price_vs_ma20"] = round((last - ma20) / ma20 * 100, 2) if ma20 else None
+    if len(close) >= 50:
+        ma50 = float(close.iloc[-50:].mean())
+        out["ma50"] = round(ma50, 2)
+        out["price_vs_ma50"] = round((last - ma50) / ma50 * 100, 2) if ma50 else None
+    if "High" in daily and "Low" in daily:
+        hi = daily["High"].dropna()
+        lo = daily["Low"].dropna()
+        if not hi.empty and not lo.empty:
+            h = float(hi.max())
+            l = float(lo.min())
+            out["pct_from_52w_high"] = round((last - h) / h * 100, 2) if h else None
+            out["pct_from_52w_low"] = round((last - l) / l * 100, 2) if l else None
+    if "Volume" in daily and len(daily) >= 21:
+        vols = daily["Volume"].dropna()
+        if len(vols) >= 21:
+            today_v = float(vols.iloc[-1])
+            avg_v = float(vols.iloc[-21:-1].mean())
+            out["rel_volume"] = round(today_v / avg_v, 2) if avg_v > 0 else None
+    return out
+
+
 def parse_download(
     df: pd.DataFrame,
     symbol: str,
@@ -160,6 +217,16 @@ def parse_download(
     return today_bars, backup_prev_close
 
 
+def parse_daily(df: pd.DataFrame, symbol: str) -> Optional[pd.DataFrame]:
+    """从批量日线结果提取 symbol 的日线 DataFrame（时间升序）。"""
+    if df is None or df.empty or not isinstance(df.columns, pd.MultiIndex):
+        return None
+    if symbol not in df.columns.get_level_values(0):
+        return None
+    sub = df[symbol].dropna(how="all")
+    return sub if not sub.empty else None
+
+
 # ---------------------------------------------------------------------------
 # 网络 I/O
 # ---------------------------------------------------------------------------
@@ -179,6 +246,24 @@ def fetch_market_data(symbols: List[str], period: str, interval: str) -> pd.Data
     )
     if df.empty:
         log.warning("行情抓取返回空数据")
+    return df
+
+
+def fetch_daily_data(symbols: List[str], period: str = "1y") -> pd.DataFrame:
+    """批量抓取日线（用于 MA/52周/相对量能）。"""
+    log.info("抓取日线: %d 个标的, period=%s", len(symbols), period)
+    df = yf.download(
+        tickers=symbols,
+        period=period,
+        interval="1d",
+        group_by="ticker",
+        auto_adjust=False,
+        prepost=False,
+        progress=False,
+        threads=True,
+    )
+    if df.empty:
+        log.warning("日线抓取返回空数据")
     return df
 
 
@@ -224,6 +309,12 @@ def run_quant(config: Dict[str, Any], fetch_quotes: bool = True) -> Dict[str, An
 
     df = fetch_market_data(all_syms, config["data"]["period"], config["data"]["interval"])
 
+    daily_df = pd.DataFrame()
+    try:
+        daily_df = fetch_daily_data(all_syms)
+    except Exception as e:  # noqa: BLE001
+        log.warning("日线抓取失败，趋势/量能指标将缺失: %s", e)
+
     today = now_et().date().isoformat()
     cache_file = CACHE_DIR / f"quote_info_{today}.json"
 
@@ -266,6 +357,7 @@ def run_quant(config: Dict[str, Any], fetch_quotes: bool = True) -> Dict[str, An
                 continue
 
             m["symbol"] = sym
+            m.update(compute_trend(parse_daily(daily_df, sym)))
             if m["split_guard"]:
                 warnings.append(f"{sym}: 疑似拆股/异常(涨跌幅 {m['change_pct']}%)，待人工核对")
             stock_rows.append(m)

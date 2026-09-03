@@ -27,6 +27,9 @@ log = logging.getLogger(__name__)
 BASE_DIR = Path(__file__).resolve().parent
 CACHE_DIR = BASE_DIR / "cache"
 UTC = pytz.utc
+_UA = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+}
 
 
 # ---------------------------------------------------------------------------
@@ -170,14 +173,83 @@ def fetch_google_news(config: Dict[str, Any]) -> List[Dict[str, Any]]:
     return items
 
 
+def parse_eastmoney_time(s: str) -> Optional[str]:
+    """解析东方财富 'YYYY-MM-DD HH:MM:SS'（Asia/Shanghai）为 UTC ISO。"""
+    if not s:
+        return None
+    try:
+        naive = dt.datetime.strptime(s.strip(), "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return None
+    sh = pytz.timezone("Asia/Shanghai")
+    return sh.localize(naive).astimezone(UTC).isoformat()
+
+
+def normalize_eastmoney_item(item: Dict[str, Any]) -> Dict[str, Any]:
+    """把东方财富搜索结果条目规范化为统一结构。"""
+    return {
+        "title": item.get("title", ""),
+        "summary": _strip_html(item.get("content", "")),
+        "url": item.get("url", ""),
+        "published_at": parse_eastmoney_time(item.get("date")),
+        "source": item.get("mediaName", "东方财富"),
+        "related_tickers": [],
+        "sentiment": None,
+    }
+
+
+def _search_eastmoney(keyword: str, page_size: int, symbol: str) -> List[Dict[str, Any]]:
+    """按关键词搜索东方财富资讯（JSONP），返回打上 symbol 标签的新闻列表。"""
+    url = "https://search-api-web.eastmoney.com/search/jsonp"
+    param = json.dumps({
+        "uid": "", "keyword": keyword, "type": ["cmsArticleWebOld"],
+        "client": "web", "clientType": "web", "clientVersion": "curr",
+        "param": {"cmsArticleWebOld": {"searchScope": "default", "sort": "default",
+                                       "pageIndex": 1, "pageSize": page_size,
+                                       "preTag": "", "postTag": ""}},
+    })
+    resp = requests.get(url, params={"cb": "cb", "param": param}, headers=_UA, timeout=15)
+    resp.raise_for_status()
+    text = resp.text
+    start, end = text.find("("), text.rfind(")")
+    if start == -1 or end == -1 or end <= start:
+        log.warning("东方财富返回格式异常(疑似反爬): %s", text[:100])
+        return []
+    data = json.loads(text[start + 1:end])
+    articles = (data.get("result") or {}).get("cmsArticleWebOld") or []
+    out = []
+    for a in articles:
+        n = normalize_eastmoney_item(a)
+        n["related_tickers"] = [symbol]
+        out.append(n)
+    return out
+
+
+def fetch_eastmoney(config: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """抓取东方财富中文新闻：按 watchlist 中文名逐个搜索。"""
+    chinese_names = config.get("chinese_names", {})
+    em_cfg = (config.get("news", {}).get("eastmoney") or {})
+    page_size = em_cfg.get("max_per_keyword", 5)
+    items: List[Dict[str, Any]] = []
+    for sym in enabled_symbols(config):
+        kw = chinese_names.get(sym)
+        if not kw:
+            continue
+        try:
+            items.extend(_search_eastmoney(kw, page_size, sym))
+        except Exception as e:  # noqa: BLE001
+            log.warning("东方财富搜索失败(%s): %s", kw, e)
+    return items
+
+
 # ---------------------------------------------------------------------------
 # 编排
 # ---------------------------------------------------------------------------
 
 def fetch_news(config: Dict[str, Any], use_cache: bool = True) -> Tuple[List[Dict[str, Any]], Optional[str]]:
-    """抓取新闻（主源 Alpha Vantage，兜底 Google News RSS）。
+    """抓取新闻：中文源东方财富 + 英文源 Alpha Vantage（兜底 Google News RSS）。
 
-    返回 (news_list, source)。source 为 'alpha_vantage' / 'google_news' / 'cache' / None。
+    返回 (news_list, source)。source 为以 '+' 连接的源名（如 'alpha_vantage+eastmoney'）或 'cache' / None。
     全部源失败返回 ([], None)。
     """
     symbols = enabled_symbols(config)
@@ -193,20 +265,30 @@ def fetch_news(config: Dict[str, Any], use_cache: bool = True) -> Tuple[List[Dic
             pass
 
     news: List[Dict[str, Any]] = []
-    source: Optional[str] = None
+    sources: List[str] = []
 
+    # 中文源：东方财富（始终尝试，作为补充）
+    if (config.get("news", {}).get("eastmoney") or {}).get("enabled", True):
+        try:
+            news.extend(fetch_eastmoney(config))
+            sources.append("eastmoney")
+        except Exception as e:  # noqa: BLE001
+            log.warning("东方财富抓取失败: %s", e)
+
+    # 英文主源：Alpha Vantage
     key = os.getenv("ALPHA_VANTAGE_API_KEY")
     if key:
         try:
-            news = fetch_alpha_vantage(config, key)
-            source = "alpha_vantage"
+            news.extend(fetch_alpha_vantage(config, key))
+            sources.append("alpha_vantage")
         except Exception as e:  # noqa: BLE001
             log.warning("Alpha Vantage 抓取失败: %s", e)
 
-    if not news:
+    # 英文兜底：Google News（仅当 Alpha Vantage 没拿到时）
+    if "alpha_vantage" not in sources:
         try:
-            news = fetch_google_news(config)
-            source = "google_news"
+            news.extend(fetch_google_news(config))
+            sources.append("google_news")
         except Exception as e:  # noqa: BLE001
             log.warning("Google News 抓取失败: %s", e)
 
@@ -223,4 +305,4 @@ def fetch_news(config: Dict[str, Any], use_cache: bool = True) -> Tuple[List[Dic
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
         cache_file.write_text(json.dumps(news, ensure_ascii=False), encoding="utf-8")
 
-    return news, source
+    return news, "+".join(sources)
