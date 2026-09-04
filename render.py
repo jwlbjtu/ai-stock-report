@@ -17,7 +17,7 @@ h2 { font-size:18px; margin:28px 0 10px; border-left:4px solid var(--accent); pa
 .prose { margin:8px 0; }
 .bench { display:inline-block; margin:0 8px 8px 0; padding:4px 10px; background:#f3f4f6; border-radius:6px; font-size:14px; }
 .table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; margin:12px 0; border:1px solid var(--line); border-radius:8px; }
-table { border-collapse:collapse; width:100%; font-size:14px; min-width:640px; }
+table { border-collapse:collapse; width:100%; font-size:14px; min-width:720px; }
 th,td { border-bottom:1px solid var(--line); padding:8px 12px; text-align:left; }
 th { color:var(--muted); font-weight:600; background:#fafafa; }
 tr:last-child td { border-bottom:none; }
@@ -41,6 +41,10 @@ def _fmt_pct(x: Optional[float]) -> str:
     if x is None:
         return "N/A"
     return f"{x:+.2f}%"
+
+
+def _fmt_price(x: Optional[float]) -> str:
+    return "—" if x is None else f"{x:.2f}"
 
 
 def _colored_pct(x: Optional[float]) -> str:
@@ -147,6 +151,8 @@ def render_html(llm_result: Dict[str, Any], quant_result: Dict[str, Any]) -> str
                 f"<td>{sym_cell}</td>"
                 f"<td class='spark-cell'>{spark}</td>"
                 f"<td class='num'>{_colored_pct(chg)}</td>"
+                f"<td class='num'>{_fmt_price(st.get('open'))}</td>"
+                f"<td class='num'>{_fmt_price(st.get('close'))}</td>"
                 f"<td class='num'>{_fmt_pct(st.get('intraday_pct'))}</td>"
                 f"<td class='num'>{_fmt_pct(st.get('gap_pct'))}</td>"
                 f"<td>{_esc(st.get('shape', ''))}</td>"
@@ -156,7 +162,7 @@ def render_html(llm_result: Dict[str, Any], quant_result: Dict[str, Any]) -> str
             )
         table = (
             "<div class='table-wrap'><table><thead><tr>"
-            "<th>代码</th><th>走势</th><th>涨跌幅</th><th>日内</th><th>跳空</th><th>形态</th><th>量能</th><th>最大异动</th>"
+            "<th>代码</th><th>走势</th><th>涨跌幅</th><th>开盘</th><th>收盘</th><th>日内</th><th>跳空</th><th>形态</th><th>量能</th><th>最大异动</th>"
             "</tr></thead><tbody>" + "".join(rows) + "</tbody></table></div>"
         )
 
