@@ -1,0 +1,32 @@
+{
+  "base_currency": "HKD",
+  "report": {
+    "output_dir": "pa_report",
+    "base_url": "https://reports.buildbodys.com/pa"
+  },
+  "positions": [
+    {"symbol": "0017.HK", "name": "新世界发展", "currency": "HKD", "quantity": 2000, "cost_price": 7.11720235},
+    {"symbol": "1045.HK", "name": "亚太卫星", "currency": "HKD", "quantity": 2000, "cost_price": 3.71310545},
+    {"symbol": "1772.HK", "name": "赣锋锂业", "currency": "HKD", "quantity": 400, "cost_price": 31.433392335},
+    {"symbol": "1818.HK", "name": "招金矿业", "currency": "HKD", "quantity": 2500, "cost_price": 29.994104262},
+    {"symbol": "2888.HK", "name": "渣打集团", "currency": "HKD", "quantity": 100, "cost_price": 146.23415815},
+    {"symbol": "2899.HK", "name": "紫金矿业", "currency": "HKD", "quantity": 16000, "cost_price": 30.945403829},
+    {"symbol": "0347.HK", "name": "鞍钢股份", "currency": "HKD", "quantity": 88000, "cost_price": 1.815262692},
+    {"symbol": "3900.HK", "name": "绿城中国", "currency": "HKD", "quantity": 1000, "cost_price": 9.178260775},
+    {"symbol": "0045.HK", "name": "大酒店", "currency": "HKD", "quantity": 2000, "cost_price": 6.063672354},
+    {"symbol": "0883.HK", "name": "中国海洋石油", "currency": "HKD", "quantity": 3000, "cost_price": 18.507859728},
+    {"symbol": "9696.HK", "name": "天齐锂业", "currency": "HKD", "quantity": 400, "cost_price": 42.246200135},
+    {"symbol": "RHM.DE", "name": "莱茵金属", "currency": "EUR", "quantity": 1, "cost_price": 1151.0},
+    {"symbol": "AEM", "name": "伊格尔矿业", "currency": "USD", "quantity": 10, "cost_price": 132.937327},
+    {"symbol": "AIQ", "name": "Global X AI ETF", "currency": "USD", "quantity": 78, "cost_price": 66.092310692},
+    {"symbol": "CANE", "name": "糖业ETF", "currency": "USD", "quantity": 6965, "cost_price": 10.174667226},
+    {"symbol": "GLD", "name": "黄金ETF", "currency": "USD", "quantity": 184.5917, "cost_price": 408.458038753},
+    {"symbol": "GOOG", "name": "谷歌", "currency": "USD", "quantity": 1, "cost_price": 169.235046},
+    {"symbol": "IBKR", "name": "盈透证券", "currency": "USD", "quantity": 18.5429, "cost_price": 74.654563202},
+    {"symbol": "NIKL", "name": "镍矿ETF", "currency": "USD", "quantity": 1000, "cost_price": 15.4510024},
+    {"symbol": "SMH", "name": "半导体ETF", "currency": "USD", "quantity": 8, "cost_price": 640.567353},
+    {"symbol": "SOXQ", "name": "费半ETF", "currency": "USD", "quantity": 35, "cost_price": 89.468574429},
+    {"symbol": "TSLA", "name": "特斯拉", "currency": "USD", "quantity": 2, "cost_price": 327.332196},
+    {"symbol": "VOO", "name": "标普500ETF", "currency": "USD", "quantity": 15, "cost_price": 676.8618138}
+  ]
+}

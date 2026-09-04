@@ -1,4 +1,4 @@
-from notifier import build_digest, parse_recipients, split_text
+from notifier import build_digest, build_pa_digest, parse_recipients, split_text
 
 
 def test_parse_recipients():
@@ -54,3 +54,20 @@ def test_split_text_long():
     assert all(len(c) <= 50 for c in chunks)
     # 拼接回去内容一致（按 \n 重建）
     assert "\n".join(chunks) == text
+
+
+def test_build_pa_digest():
+    pa = {
+        "date": "2026-09-03",
+        "base_currency": "HKD",
+        "total": {"value": 1000000.0, "pnl": 100000.0, "pnl_pct": 11.11},
+        "positions": [
+            {"symbol": "2899.HK", "pnl_pct": 15.67},
+            {"symbol": "0347.HK", "pnl_pct": -36.65},
+        ],
+    }
+    d = build_pa_digest(pa, "https://example.com/pa/2026-09-03.html")
+    assert "个人持仓复盘" in d
+    assert "领涨 2899.HK" in d
+    assert "领跌 0347.HK" in d
+    assert "https://example.com/pa/2026-09-03.html" in d

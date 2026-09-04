@@ -97,6 +97,12 @@ server {
     location / {
         try_files $uri $uri/ =404;
     }
+
+    # PA 持仓报告（子路径 /pa/）
+    location /pa/ {
+        alias /var/www/ai-stock-report/pa_report/;
+        index index.html;
+    }
 }
 ```
 
@@ -143,12 +149,14 @@ crontab -e
 ```cron
 CRON_TZ=America/New_York
 35 17 * * 1-5 cd /var/www/ai-stock-report && .venv/bin/python main.py >> logs/cron.log 2>&1
+40 17 * * 1-5 cd /var/www/ai-stock-report && .venv/bin/python main_pa.py >> logs/cron_pa.log 2>&1
 ```
 
 - `CRON_TZ`：按美东时区解释时间；
 - `35 17 * * 1-5`：每个工作日 17:35（收盘后），节假日由 `is_trading_day()` 兜底；
 - 用 `.venv/bin/python` 的**完整路径**，避免依赖系统 Python；
 - `logs/` 目录需提前创建：`mkdir -p /var/www/ai-stock-report/logs`。
+- **两条 cron 相互独立**：`main.py`（AI 复盘）与 `main_pa.py`（PA 持仓）各自独立进程、独立日志，一条失败不影响另一条。
 
 ---
 
@@ -191,6 +199,8 @@ git checkout main            # 回到最新
 | `.env`（密钥） | 在 `.gitignore`，`git pull` 永不覆盖 ✅ |
 | `cache/` `memory/` `report/` | 都在 `.gitignore`，pull 不覆盖 VPS 已生成数据 ✅ |
 | `config.json` | **被 git 跟踪**。若在 VPS 手动改过它，pull 可能冲突。建议配置变更统一走 GitHub |
+| `pa_holdings.json` | **被 git 跟踪**（PA 持仓清单）。调仓用 `python3 pa_manage.py`，或改了后 commit 推送 |
+| `pa_report/` | 在 `.gitignore`，pull 不覆盖 VPS 已生成数据 ✅ |
 | 新增依赖 | `update.sh` 会自动重装 |
 | nginx / cron | 只有项目路径或端口变化时才需改动 |
 

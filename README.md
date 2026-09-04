@@ -15,6 +15,7 @@
 - **LLM 复盘**：DeepSeek-chat 生成结构化 JSON（资金广度 / 关联解读 / 形态点评 / 趋势位置 / 连续性复盘 / 风险提示），带**跨日记忆**（结合昨日结论看延续 vs 反转）。
 - **推送降级链**：WxPusher → Telegram → 落盘，主通道失败自动切备，多收件人支持。
 - **报告网页**：静态 HTML（内联 CSS，移动端优先），含**个股走势图 sparkline + 市场热力图**，自动生成历史报告列表 `index.html`。
+- **个人持仓（PA）复盘**：独立的个人组合日报——实时行情 + 盈亏（折算港币）+ 走势（MA/52周）+ 集中度，与 AI 复盘完全隔离、互不影响。
 
 ---
 
@@ -47,12 +48,18 @@ ai-stock-report/
 ├── llm_analyzer.py       # DeepSeek 归因与记忆
 ├── notifier.py           # 推送路由与降级
 ├── render.py             # HTML 渲染（报告 + 列表）
+├── main_pa.py            # PA 持仓报告入口（独立）
+├── pa_engine.py          # PA 持仓引擎（行情/盈亏/汇率/走势）
+├── pa_render.py          # PA 报告渲染
+├── pa_manage.py          # PA 调仓 CLI
+├── pa_holdings.json      # PA 持仓配置（买入价+股数）
 ├── logger.py             # 日志
 ├── requirements.txt      # 依赖
 ├── .env.example          # 密钥模板
 ├── .env                  # 密钥（git 忽略，勿提交）
 ├── tests/                # 单元测试（pytest）
 ├── report/               # 生成的报告（git 忽略）
+├── pa_report/            # PA 报告输出（git 忽略）
 ├── cache/                # 运行时缓存（git 忽略）
 ├── memory/               # 跨日记忆（git 忽略）
 ├── DESIGN.md             # 详细设计文档
@@ -199,6 +206,45 @@ grep "每日复盘完成" logs/cron.log    # 确认最近一次成功
 5. **权限**：`sudo chmod -R o+rX /path/to/ai-stock-report/report`，并放行 80/443 端口。
 
 之后每天 cron 跑完，HTML 自动落到 `report/`，nginx 实时读文件，**无需每天重启**。根路径 `reports.yourdomain.com/` 会自动显示历史报告列表（`index.html`）。
+
+---
+
+## PA 持仓复盘（个人组合）
+
+除了 AI 子板块复盘，系统还能生成一份**个人持仓（PA）日报**，两者完全独立、互不影响：
+
+- **独立入口** `main_pa.py`，独立 cron，独立日志 `logs/cron_pa.log`，独立输出 `pa_report/`；一份失败不影响另一份。
+- **数据**：`pa_holdings.json` 只存**买入价 + 股数**（唯一信任的输入），现价/市值/盈亏全部实时抓取。
+- **总盈亏折算港币**（`base_currency: "HKD"`，汇率实时抓取）。
+- **走势分析**：今日涨跌 + MA20/50 + 距 52 周高低点（确定性规则，无 LLM）。
+- **推送**：复用同一微信/Telegram 通道，摘要标题带 `💼 个人持仓复盘`。
+
+### 调仓（更新仓位）
+
+用命令行工具增删改持仓，无需手改 JSON：
+
+```bash
+python3 pa_manage.py list                          # 查看当前持仓
+python3 pa_manage.py add AAPL 10 180.5 USD 苹果     # 新增：代码 数量 成本价 币种 [名称]
+python3 pa_manage.py update AAPL --quantity 20      # 改数量（或 --cost-price / --name）
+python3 pa_manage.py remove AAPL                    # 删除
+```
+
+- 港股代码用 4 位加 `.HK`（`17`→`0017.HK`），德国股加 `.DE`（`RHM.DE`），美股直接写。
+- 改完下次 cron 自动生效。
+
+### 运行与定时
+
+```bash
+python3 main_pa.py
+```
+
+报告落在 `pa_report/`，访问 `https://reports.buildbodys.com/pa/`。定时任务（与 AI 复盘独立，互不影响）：
+
+```cron
+CRON_TZ=America/New_York
+40 17 * * 1-5 cd /var/www/ai-stock-report && .venv/bin/python main_pa.py >> logs/cron_pa.log 2>&1
+```
 
 ---
 

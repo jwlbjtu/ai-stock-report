@@ -5,6 +5,10 @@
 report/*
 !report/.gitkeep
 
+# Generated PA reports
+pa_report/*
+!pa_report/.gitkeep
+
 # Runtime cache (market cap / quote info)
 cache/
 

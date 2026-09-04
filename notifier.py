@@ -17,8 +17,11 @@ log = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent
 REPORT_DIR = BASE_DIR / "report"
+PA_REPORT_DIR = BASE_DIR / "pa_report"
 
 WXPUSHER_URL = "https://wxpusher.zjiecode.com/api/send/message"
+
+_CUR_SYMBOL = {"HKD": "HK$", "USD": "US$", "EUR": "€", "GBP": "£", "CNY": "¥", "JPY": "¥"}
 
 
 # ---------------------------------------------------------------------------
@@ -36,6 +39,15 @@ def _fmt_pct(x: Optional[float]) -> str:
     if x is None:
         return "N/A"
     return f"{x:+.2f}%"
+
+
+def _fmt_num(x: Optional[float], sign: bool = False) -> str:
+    if x is None:
+        return "N/A"
+    s = f"{x:,.2f}"
+    if sign and x > 0:
+        s = "+" + s
+    return s
 
 
 def build_digest(
@@ -142,9 +154,9 @@ def send_telegram(bot_token: str, chat_ids: List[str], text: str) -> Tuple[bool,
     return all_ok, errors
 
 
-def _save_fallback(content: str) -> Path:
-    REPORT_DIR.mkdir(parents=True, exist_ok=True)
-    out = REPORT_DIR / f"fallback_{now_et().strftime('%Y%m%d_%H%M%S')}.txt"
+def _save_fallback(content: str, out_dir: Path = REPORT_DIR) -> Path:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out = out_dir / f"fallback_{now_et().strftime('%Y%m%d_%H%M%S')}.txt"
     out.write_text(content, encoding="utf-8")
     return out
 
@@ -153,20 +165,43 @@ def _save_fallback(content: str) -> Path:
 # 编排
 # ---------------------------------------------------------------------------
 
-def send_notification(
-    quant_result: Dict[str, Any],
-    llm_result: Optional[Dict[str, Any]],
-    report_url: Optional[str] = None,
-) -> Dict[str, Any]:
-    """发送摘要，WxPusher 主通道 → Telegram 备用 → 落盘。返回发送结果。"""
-    digest = build_digest(quant_result, llm_result, report_url)
+def build_pa_digest(pa_result: Dict[str, Any], report_url: Optional[str] = None) -> str:
+    """构建 PA 持仓推送摘要（纯文本 + emoji）。"""
+    base = pa_result.get("base_currency", "HKD")
+    base_sym = _CUR_SYMBOL.get(base, base + " ")
+    total = pa_result.get("total", {})
+    lines = [f"💼 个人持仓复盘 · {pa_result['date']}", ""]
+    lines.append(f"总市值（折{base}）: {base_sym}{_fmt_num(total.get('value'))}")
+    lines.append(f"浮动盈亏: {base_sym}{_fmt_num(total.get('pnl'), sign=True)} （{_fmt_pct(total.get('pnl_pct'))}）")
 
-    # 主通道 WxPusher
+    pairs = [
+        (p.get("symbol", ""), p.get("pnl_pct"))
+        for p in pa_result.get("positions", [])
+        if p.get("pnl_pct") is not None
+    ]
+    if pairs:
+        pairs.sort(key=lambda x: x[1])
+        lines.append("")
+        lines.append(f"领涨 {pairs[-1][0]} {_fmt_pct(pairs[-1][1])} ｜ 领跌 {pairs[0][0]} {_fmt_pct(pairs[0][1])}")
+
+    if report_url:
+        lines.append("")
+        lines.append(f"完整报告: {report_url}")
+    return "\n".join(lines)
+
+
+def send_pa_notification(pa_result: Dict[str, Any], report_url: Optional[str] = None) -> Dict[str, Any]:
+    """发送 PA 持仓摘要。"""
+    return _dispatch(build_pa_digest(pa_result, report_url), fallback_dir=PA_REPORT_DIR)
+
+
+def _dispatch(text: str, fallback_dir: Path = REPORT_DIR) -> Dict[str, Any]:
+    """发送文本：WxPusher 主通道 → Telegram 备用 → 落盘。返回发送结果。"""
     app_token = os.getenv("WXPUSHER_APP_TOKEN")
     uids = parse_recipients(os.getenv("WXPUSHER_UIDS"))
     if app_token and uids:
         try:
-            ok, data = send_wxpusher(app_token, uids, digest)
+            ok, data = send_wxpusher(app_token, uids, text)
             if ok:
                 log.info("WxPusher 发送成功")
                 return {"channel": "wxpusher", "success": True}
@@ -176,12 +211,11 @@ def send_notification(
     else:
         log.warning("WxPusher 未配置(appToken/uids 缺失)")
 
-    # 备用通道 Telegram
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
     chat_ids = parse_recipients(os.getenv("TELEGRAM_CHAT_IDS"))
     if bot_token and chat_ids:
         try:
-            all_ok, errors = send_telegram(bot_token, chat_ids, digest)
+            all_ok, errors = send_telegram(bot_token, chat_ids, text)
             if all_ok:
                 log.info("Telegram 发送成功")
                 return {"channel": "telegram", "success": True}
@@ -191,7 +225,15 @@ def send_notification(
     else:
         log.warning("Telegram 未配置(bot token/chat_id 缺失)")
 
-    # 都失败 → 落盘
-    out = _save_fallback(digest)
+    out = _save_fallback(text, fallback_dir)
     log.error("所有通道发送失败，已落盘: %s", out)
     return {"channel": "file", "success": False, "file": str(out)}
+
+
+def send_notification(
+    quant_result: Dict[str, Any],
+    llm_result: Optional[Dict[str, Any]],
+    report_url: Optional[str] = None,
+) -> Dict[str, Any]:
+    """发送 AI 复盘摘要，WxPusher 主通道 → Telegram 备用 → 落盘。"""
+    return _dispatch(build_digest(quant_result, llm_result, report_url))
